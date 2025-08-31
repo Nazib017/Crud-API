@@ -1,7 +1,8 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart';
+import 'package:http/http.dart' as http;
+// I'm assuming your custom snackbar is in this file.
+// If not, replace it with ScaffoldMessenger.of(context).showSnackBar(...)
 import 'package:crud_api/widgets/snackbar_message.dart';
 
 class AddNewProductScreen extends StatefulWidget {
@@ -23,95 +24,103 @@ class _AddNewProductScreenState extends State<AddNewProductScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Add new product')),
+      appBar: AppBar(title: const Text('Add New Product')),
       body: SingleChildScrollView(
         child: Form(
           key: _formKey,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
-              spacing: 8,
               children: [
                 TextFormField(
                   controller: _nameTEController,
                   textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Product name',
                     labelText: 'Product name',
                   ),
                   validator: (String? value) {
                     if (value?.trim().isEmpty ?? true) {
-                      return 'Enter your value';
+                      return 'Enter product name';
                     }
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _codeTEController,
+                  keyboardType: TextInputType.text, // Product codes can be alphanumeric
                   textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Product code',
                     labelText: 'Product code',
                   ),
                   validator: (String? value) {
                     if (value?.trim().isEmpty ?? true) {
-                      return 'Enter your value';
+                      return 'Enter product code';
                     }
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _quantityTEController,
                   keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Quantity',
                     labelText: 'Quantity',
                   ),
                   validator: (String? value) {
                     if (value?.trim().isEmpty ?? true) {
-                      return 'Enter your value';
+                      return 'Enter quantity';
                     }
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _priceTEController,
                   textInputAction: TextInputAction.next,
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Unit price',
                     labelText: 'Unit price',
                   ),
                   validator: (String? value) {
                     if (value?.trim().isEmpty ?? true) {
-                      return 'Enter your value';
+                      return 'Enter unit price';
                     }
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _imageUrlTEController,
-                  decoration: InputDecoration(
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
                     hintText: 'Image Url',
                     labelText: 'Image Url',
                   ),
                   validator: (String? value) {
                     if (value?.trim().isEmpty ?? true) {
-                      return 'Enter your value';
+                      return 'Enter image URL';
                     }
                     return null;
                   },
                 ),
-                const SizedBox(height: 8),
-                Visibility(
-                  visible: _addProductInProgress == false,
-                  replacement: Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                  child: FilledButton(
-                    onPressed: _onTapAddProductButton,
-                    child: Text('Add Product'),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: Visibility(
+                    visible: _addProductInProgress == false,
+                    replacement: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                    child: FilledButton(
+                      onPressed: _onTapAddProductButton,
+                      child: const Text('Add Product'),
+                    ),
                   ),
                 ),
               ],
@@ -123,50 +132,62 @@ class _AddNewProductScreenState extends State<AddNewProductScreen> {
   }
 
   Future<void> _onTapAddProductButton() async {
-    if (_formKey.currentState!.validate() == false) {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    _addProductInProgress = true;
-    setState(() {});
-    // Prepare URI to request
-    Uri uri = Uri.parse('http://35.73.30.144:2008/api/v1/CreateProduct');
-    // Prepare data
-    int totalPrice = int.parse(_priceTEController.text) *
-        int.parse(_quantityTEController.text);
-    Map<String, dynamic> requestBody = {
-      "ProductName": _nameTEController.text.trim(),
-      "ProductCode": int.parse(_codeTEController.text.trim()),
-      "Img": _imageUrlTEController.text.trim(),
-      "Qty":  int.parse(_quantityTEController.text.trim()),
-      "UnitPrice":  int.parse(_priceTEController.text.trim()),
-      "TotalPrice": totalPrice
-    };
-    // Request with data
-    Response response = await post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: jsonEncode(requestBody),
-    );
-    print(response.statusCode);
-    print(response.body);
+    setState(() {
+      _addProductInProgress = true;
+    });
 
-    if (response.statusCode == 200) {
-      final decodedJson = jsonDecode(response.body);
-      if (decodedJson['status'] == 'success') {
-        _clearTextFields();
-        showSnackBarMessage(context, 'Product created successfully');
+    try {
+      // Safely parse numbers to prevent crashes
+      final int quantity = int.tryParse(_quantityTEController.text.trim()) ?? 0;
+      final int unitPrice = int.tryParse(_priceTEController.text.trim()) ?? 0;
+
+      Map<String, dynamic> requestBody = {
+        "ProductName": _nameTEController.text.trim(),
+        "ProductCode": _codeTEController.text.trim(), // Keep as string if it can have letters
+        "Img": _imageUrlTEController.text.trim(),
+        "Qty": quantity,
+        "UnitPrice": unitPrice,
+        "TotalPrice": quantity * unitPrice
+      };
+
+      Uri uri = Uri.parse('http://35.73.30.144:2008/api/v1/CreateProduct');
+      final http.Response response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final decodedJson = jsonDecode(response.body);
+        if (decodedJson['status'] == 'success') {
+          _clearTextFields();
+          showSnackBarMessage(context, 'Product created successfully!');
+
+        } else {
+          showSnackBarMessage(context, decodedJson['data'] ?? 'Failed to create product.');
+        }
       } else {
-        String errorMessage = decodedJson['data'];
 
-        showSnackBarMessage(context, errorMessage);
+        showSnackBarMessage(context, 'Error: Could not add product. Status code: ${response.statusCode}');
       }
-    }
+    } catch (e) {
 
-    _addProductInProgress = false;
-    setState(() {});
+      if (mounted) {
+        showSnackBarMessage(context, 'An error occurred: $e');
+      }
+    } finally {
+
+      setState(() {
+        _addProductInProgress = false;
+      });
+    }
   }
 
   void _clearTextFields() {
